@@ -98,17 +98,37 @@ check("the weather body follows the text language", () => {
   assert.ok(formatWeather(value("ru"), "ru").startsWith("Weather for "));
 });
 
-check("uncertainty notes follow the output language", () => {
-  const zh = assessUncertainty({ sources: [], lang: "zh" });
-  assert.equal(zh.level, "low");
-  assert.ok(zh.notes.some((note) => /没有返回结果/.test(note)), zh.notes.join("|"));
+check("uncertainty notes follow the text language (zh / en / ja, others en)", () => {
+  const notes = (lang, promptLanguage) => assessUncertainty({ sources: [], lang, promptLanguage }).notes;
+  assert.equal(assessUncertainty({ sources: [], lang: "zh" }).level, "low");
+  assert.deepEqual(notes("zh"), ["没有返回结果"]);
+  assert.deepEqual(notes("en"), ["no results returned"]);
+  assert.deepEqual(notes("ja"), ["結果が返らなかった"]);
+  assert.deepEqual(notes(" JA "), ["結果が返らなかった"]);
+  assert.deepEqual(notes("ru"), ["no results returned"]);
+  // promptLanguage: zh 仍优先中文（与改动前一致）
+  assert.deepEqual(notes("ja", "zh"), ["没有返回结果"]);
+  assert.deepEqual(notes("en", "zh"), ["没有返回结果"]);
+  assert.deepEqual(notes("ja", "en"), ["結果が返らなかった"]);
+});
 
-  const ja = assessUncertainty({ sources: [], lang: "ja" });
-  assert.ok(ja.notes.some((note) => /no results returned/.test(note)), ja.notes.join("|"));
-  assert.ok(ja.notes.every((note) => !/[\u4e00-\u9fa5]/.test(note)), ja.notes.join("|"));
-
-  const en = assessUncertainty({ sources: [], lang: "en" });
-  assert.ok(en.notes.some((note) => /no results returned/.test(note)));
+check("every uncertainty note has a Japanese text", () => {
+  const sources = (...urls) => urls.map((url) => ({ url }));
+  const cases = [
+    [{ sources: [] }, "結果が返らなかった"],
+    [{ sources: sources("https://a.example/1") }, "情報源が 1 件だけ"],
+    [{ sources: sources("https://a.example/1", "https://a.example/2", "https://a.example/3") }, "すべての結果が同じサイトのもの"],
+    [{ sources: sources("https://a.example/1", "https://b.example/2") }, "情報源が 2 件だけ"],
+    [{ sources: sources("https://a.example/1", "https://b.example/2", "https://c.example/3"), timeRange: true }, "期間で絞り込んだが、結果に公開日が無い"],
+    [{ sources: sources("https://a.example/1", "https://b.example/2", "https://c.example/3"), note: "bing failed, using ddg" }, "一部のエンジンが失敗したため、結果が欠けている可能性がある"],
+    [{ sources: sources("https://a.example/1", "https://b.example/2", "https://www.zhihu.com/q") }, "まとめサイトの内容を含むため、別の情報源でも確かめたい"],
+  ];
+  for (const [input, expected] of cases) {
+    const ja = assessUncertainty({ ...input, lang: "ja" });
+    assert.ok(ja.notes.includes(expected), `${expected} not in ${ja.notes.join("|")}`);
+    // 等级与语言无关
+    assert.equal(ja.level, assessUncertainty({ ...input, lang: "en" }).level);
+  }
 });
 
 check("a failure note is reported in the output language", () => {
@@ -119,7 +139,10 @@ check("a failure note is reported in the output language", () => {
   ];
   const ja = assessUncertainty({ sources, note: "bing failed, using ddg", lang: "ja" });
   assert.equal(ja.level, "low");
-  assert.ok(ja.notes.every((note) => !/[\u4e00-\u9fa5]/.test(note)), ja.notes.join("|"));
+  assert.deepEqual(ja.notes, ["一部のエンジンが失敗したため、結果が欠けている可能性がある"]);
+
+  const ru = assessUncertainty({ sources, note: "bing failed, using ddg", lang: "ru" });
+  assert.deepEqual(ru.notes, ["some engines failed; the result may be incomplete"]);
 
   const zh = assessUncertainty({ sources, note: "bing failed, using ddg", lang: "zh" });
   assert.ok(zh.notes.some((note) => /不完整/.test(note)));

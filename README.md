@@ -310,7 +310,7 @@ fallbackOn: [quota, auth, bot-wall, transient, invalid-response, unknown]   # �
 lang: zh                    # 搜索语言池/本地化（zh / en / ru …，不再被设置页强行改写）
 #   lang 决定：Bing 的 mkt/Accept-Language、Wikipedia 子域（ja → ja.wikipedia.org）、地理编码语言；
 #   我们自己渲染的文案只有中文/英文两套，其它语言（ja/ru/de…）一律走英文，避免回答前先塞一段中文（#92）；
-#   weather 例外，另有日文（ja 得到日文天气，ru/de… 仍走英文）。
+#   weather 与置信度说明例外，另有日文（ja 得到日文，ru/de… 仍走英文；promptLanguage: zh 时置信度说明仍为中文）。
 #   web_fetch（fs-quality-fetch）的 Accept-Language 同样跟随 lang，不再固定中文（#92）。
 uiLang: zh                  # 设置页界面语言（zh / en）；留空则跟随 lang
 promptLanguage: en          # 注入给模型的系统提示词与工具描述语言（en / zh）；只翻叙述文字，工具名/参数/枚举保持英文
@@ -437,7 +437,7 @@ Search engine test:
 | `reddit` | Reddit 帖子/讨论搜索（公开 JSON API；部分网络环境可能被 Reddit 反爬拦截） |
 | `hn` | Hacker News 技术社区讨论（Algolia 官方 API） |
 | `stackoverflow` | Stack Overflow 技术问答（Stack Exchange 官方公开 API） |
-| `wikipedia` | 维基百科词条（中文环境用 zh.wikipedia.org，`lang: en` 时切换 en.wikipedia.org） |
+| `wikipedia` | 维基百科词条（按 `lang` 选子域：zh.wikipedia.org / en.wikipedia.org / ja.wikipedia.org…，未知语言用 en） |
 | `npm` | npm 包搜索（registry 官方 API） |
 | `youtube` | YouTube 视频搜索（抓 results 页 `ytInitialData`，免 key） |
 | `vimeo` | Vimeo 视频搜索（抓搜索页内嵌数据；抓不到时退回网页搜索 `site:vimeo.com`，免 key） |
@@ -517,7 +517,7 @@ Search engine test:
 | `assert-killtree-win32.mjs` | Windows 子进程树终止（#74）：不再依赖 `taskkill` | `node tools/assert-killtree-win32.mjs`（8） |
 | `assert-killtree-portable.mjs` | 跨平台 `killTree` 便携版契约 | `node tools/assert-killtree-portable.mjs`（5） |
 | `assert-parallel-mcp.mjs` | Parallel MCP 引擎：25 s 超时/调用方取消覆盖**响应体读取**、共享 SSE 解析器（通知/多行帧）、6 类错误路径、REST 精确时间过滤 | `node tools/assert-parallel-mcp.mjs`（15） |
-| `assert-output-language.mjs` | 语言分支（#92）：`searchLanguage` 支持 zh/en/ja/ru/de/es/fr/ko 其余回退 en、`outputLanguage` 只输出 zh/en、天气文案 zh/en/ja（其它回退英文，含 WMO 描述与正文）、置信度说明随语言、失败备注随语言 | `node tools/assert-output-language.mjs`（10） |
+| `assert-output-language.mjs` | 语言分支（#92）：`searchLanguage` 支持 zh/en/ja/ru/de/es/fr/ko 其余回退 en、`outputLanguage` 只输出 zh/en、天气文案 zh/en/ja（其它回退英文，含 WMO 描述与正文）、置信度说明 zh/en/ja（promptLanguage: zh 优先中文，每条都有日文）、失败备注随语言 | `node tools/assert-output-language.mjs`（11） |
 | `assert-uncertainty.mjs` | 输出契约：0/1 源为 low、2 源与同站为 medium、3 个不同域为 high、时间过滤无日期、失败备注、聚合站提示 | `node tools/assert-uncertainty.mjs`（8） |
 | `assert-youcom.mjs` | You.com 免 key 档（#90）：两档 URL 与请求头、无 key 不发 `X-API-Key`、`YDC_API_KEY` 别名、429/401/402/5xx 分类 | `node tools/assert-youcom.mjs`（23） |
 | `assert-prompt-language.mjs` | 提示词语言（en/zh）：语言回退、9 个工具双语文案、标识符不被翻译、占位符插值、切换时只重注册一次 | `node tools/assert-prompt-language.mjs`（7） |
@@ -862,7 +862,7 @@ fallbackOn: [quota, auth, bot-wall, transient, invalid-response, unknown]   # fa
 lang: zh                    # search language pools / localization (zh / en / ru …; no longer rewritten by the settings page)
 #   lang drives Bing's mkt/Accept-Language, the Wikipedia subdomain (ja → ja.wikipedia.org) and the geocoding language;
 #   text this plugin renders itself only exists in Chinese and English, so other languages (ja/ru/de…) get English rather than a wall of Chinese (#92);
-#   weather also has Japanese (ja gets Japanese weather text, ru/de… still get English).
+#   weather and the confidence notes also have Japanese (ja gets Japanese, ru/de… still get English; with promptLanguage: zh the confidence notes stay Chinese).
 #   web_fetch (fs-quality-fetch) sends the same Accept-Language instead of a fixed Chinese one (#92).
 uiLang: zh                  # settings UI language (zh / en); empty = follow lang
 promptLanguage: en          # language of the system prompt section and tool descriptions (en / zh); prose only - tool names, params and enums stay English
@@ -989,7 +989,7 @@ Ask the agent to search specific platforms (e.g., *"Search GitHub for deepseek h
 | `reddit` | Reddit posts / discussions (public JSON API; may be blocked by Reddit anti-bot in some network environments) |
 | `hn` | Hacker News tech community discussions (official Algolia API) |
 | `stackoverflow` | Stack Overflow Q&A (official public Stack Exchange API) |
-| `wikipedia` | Wikipedia articles (zh.wikipedia.org for Chinese; switches to en.wikipedia.org when `lang: en`) |
+| `wikipedia` | Wikipedia articles (subdomain follows `lang`: zh.wikipedia.org / en.wikipedia.org / ja.wikipedia.org…; unknown languages use en) |
 | `npm` | npm package search (registry official API) |
 | `youtube` | YouTube video search (scrapes the results page `ytInitialData`, keyless) |
 | `vimeo` | Vimeo video search (scrapes the search page's embedded data; falls back to web search `site:vimeo.com`, keyless) |
@@ -1069,7 +1069,7 @@ Restart `dsh web` after switching to apply changes.
 | `assert-killtree-win32.mjs` | Windows process-tree termination (#74): no longer relies on `taskkill` | `node tools/assert-killtree-win32.mjs` (8) |
 | `assert-killtree-portable.mjs` | portable `killTree` contract | `node tools/assert-killtree-portable.mjs` (5) |
 | `assert-parallel-mcp.mjs` | Parallel MCP engine: the 25 s timeout / caller abort covers the **body read**, shared SSE parser (notifications, multiline frames), six error paths, REST precise time filtering | `node tools/assert-parallel-mcp.mjs` (15) |
-| `assert-output-language.mjs` | language branches (#92): `searchLanguage` passes zh/en/ja/ru/de/es/fr/ko through and falls back to en, `outputLanguage` only returns zh/en, weather text has zh/en/ja (WMO descriptions and body; others fall back to English), and both confidence and failure notes follow the language | `node tools/assert-output-language.mjs` (10) |
+| `assert-output-language.mjs` | language branches (#92): `searchLanguage` passes zh/en/ja/ru/de/es/fr/ko through and falls back to en, `outputLanguage` only returns zh/en, weather text has zh/en/ja (WMO descriptions and body; others fall back to English), confidence notes have zh/en/ja (promptLanguage: zh still wins; every note has Japanese), and failure notes follow the language | `node tools/assert-output-language.mjs` (11) |
 | `assert-uncertainty.mjs` | output contract: 0/1 source is low, two sources or a single site is medium, three distinct domains is high, time filter without dates, failure notes, aggregator caveat | `node tools/assert-uncertainty.mjs` (8) |
 | `assert-youcom.mjs` | You.com keyless tier (#90): both URLs and headers, no `X-API-Key` without a key, the `YDC_API_KEY` alias, and 429/401/402/5xx classification | `node tools/assert-youcom.mjs` (23) |
 | `assert-prompt-language.mjs` | Prompt language (en/zh): fallback rules, bilingual copy for all 9 tools, identifiers left untranslated, placeholder interpolation, and one re-registration per language change | `node tools/assert-prompt-language.mjs` (7) |
